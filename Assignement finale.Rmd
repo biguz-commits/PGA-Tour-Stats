@@ -1,0 +1,523 @@
+---
+title: "Tommaso Biganzoli"
+author: "Final Assignement"
+date: "2024-02-28"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+### Data representation
+The following dataset represent PGA Tour’s golf Players Stats of 2021/2022 season, taken from [https://www.pgatour.com/stats.html], which is the official website of PGA Tour.
+The PGA Tour is an organization that runs the leading professional golf tours in the United States.
+The study is done by all the coaches of the PGA Tour, to improve the playing conditions of their player, with the main objective of improving their game, and then to increase their earnings, For this you research what are the factors that affect the most seasonal earnings of a player.
+Here is an article with the example of player Scott Stallings. [https://www.golfdigest.com/story/why-a-little-stat-analysis-goes-a-long-way-on-the-pga-tour].
+I decided to center all my data to its mean value, in order to overcome the discrepancy in the units of measurement.
+```{r include=FALSE}
+library(readxl)
+PGATour=read_excel("/Users/tommasobiganzoli/PGATour$.xlsx",col_names = TRUE)
+colnames(PGATour) = c("Name", "Rounds", "Strks", "ScoreAVG", "Sponsor", "GIR", "GreensHIT", "Earnings","RelPar", "AVGPutting","DrivAccuracy", "Country","AVGDrivDistance")
+PGATour$Rounds = PGATour$Rounds-mean(PGATour$Rounds)
+PGATour$Strks = PGATour$Strks - mean(PGATour$Strks)
+PGATour$ScoreAVG = PGATour$ScoreAVG - mean(PGATour$ScoreAVG)
+PGATour$GIR = PGATour$GIR - mean(PGATour$GIR)
+PGATour$GreensHIT = PGATour$GreensHIT - mean(PGATour$GreensHIT)
+PGATour$Earnings = PGATour$Earnings - mean(PGATour$Earnings)
+PGATour$RelPar = PGATour$RelPar - mean(PGATour$RelPar)
+PGATour$AVGPutting = PGATour$AVGPutting - mean(PGATour$AVGPutting)
+PGATour$DrivAccuracy = PGATour$DrivAccuracy - mean(PGATour$DrivAccuracy)
+PGATour$AVGDrivDistance = PGATour$AVGDrivDistance - mean(PGATour$AVGDrivDistance)
+```
+```{r}
+str(PGATour)
+```
+```{r include=FALSE}
+df = data.frame(
+  Rounds = PGATour$Rounds,
+  GIR = PGATour$GIR,
+  Strks = PGATour$Strks,
+  RelPar = PGATour$RelPar,
+  Score = PGATour$ScoreAVG,
+  GreensHIT = PGATour$GreensHIT,
+  AVGPutting = PGATour$AVGPutting,
+  DrivingAccuracy = PGATour$DrivAccuracy,
+  DrivingDistance = PGATour$AVGDrivDistance,
+  Earnings = PGATour$Earnings
+)
+correlation_matrix = cor(df)
+```
+
+###### Where
+*Name* : Player Name
+*Rounds* : Total rounds played for each player (4*number of tournaments made).
+*Strks* : Average Value Per Tournament for Strokes Gain on Approach (negative: I lost strokes on my short game in comparison to all other players).
+*ScoreAVG* : Score average, calculated as sum of the results/ # of rounds
+*GIR* : Percentage of Greens Hit in Regulation (GIR, How many Greens in % I hit for each tournament I play).
+*GreensHIT* : total # of greens hit in the regular season.
+*RelPar* : Score relative to par per GIR (For each Green Hit per Tournament, the average of the difference between par and my final score).
+*AVGPutting* : Average distance for birdie putt made (how long was my birdie putt, given the fact I made birdie).
+*Sponsor* : Sponsor (which golf equipment they use (Titleist Taylormade or Callaway)), this is a categorical predictor.
+*Earnings* : How many dollars they earn in the 2021 season.
+*DrivAccuracy* : probability of taking the farway whenever using the drive from the tee, calculated as # farway taken / # farway total.
+*Country* : country country from where they come.
+*AVGDrivDistance* : Average of the meters made by the tee with the drive. Calculated as
+Total meters made by tee with drive/ number of rounds. 
+
+##### Correlation among all the variables
+```{r echo=FALSE, fig.cap="Figure 1: *In the picture above we can see the graphical representation of the correlation matrix, so stresses the relationship between the Earnings response variable and all other quantitative covariates, when we build the regression model then we will expect a high correlation with ScoreAVG and Driving Distance, which are identified by the circles with wider diameter and darker color*.", message=FALSE}
+library(corrplot)
+corrplot(correlation_matrix, method = "circle")
+```
+
+```{r echo=FALSE, fig.cap=c("Figure 2.0", "Figure 2.1")}
+par(mfrow = c(1,2))
+PGATour$Country = factor(PGATour$Country)
+color_groups = hcl.colors(n=length(levels(PGATour$Country)), palette = "Zissou1")
+plot(PGATour$Country,PGATour$Earnings ,
+     col = color_groups, pch = 16, main = "Country",
+     xlab = "Country", ylab = "Earnings")
+PGATour$Sponsor = factor(PGATour$Sponsor)
+color_groups = hcl.colors(n=length(levels(PGATour$Sponsor)), palette = "Zissou1")
+plot(PGATour$Sponsor,PGATour$Earnings ,
+     col = color_groups, pch = 16, main = "Sponsor",
+     xlab = "Sponsor", ylab = "Earnings")
+axis(1, at = 1:length(levels(PGATour$Sponsor)), labels = levels(PGATour$Sponsor))
+```
+Figure 2.0 : *The figure shows the distribution of the qualitative variable Country, or the country of origin of the players, for the variable continuous response Earnings.Both levels have the same variability, but the "Other" level covers higher y values.Both lack symmetry with respect to the median, as we see the non-centrality of the black bar.For black dots outside the bar range, a high anomalous value of the Earnings variable belongs to the US level and a low anomalous value belongs to the Other level. In short, what he earned the most was American and what he earned the least was not*.
+Figure 2.1 : *As for the variable Sponsor character, which represents the brand that sponsors the players of PGATour, has three categories, from the left, Callaway, Taylormade, Titleist.We immediately realize that the three categories do not have the same variability, as Titleist has a much narrower bar than the other two, and Taylormade, has a much wider Titleist and little wider than Callaway.Titleist appears to be the only one symmetrical to the median, while the other two do not.While as for anomalous points, they are practically equidestribiti between Callaway and Titleist*.
+
+#### Explaining my response 
+Before building my multiple regression model, I looked for possible interaction between my qualitative and quantitative variables. 
+As we can see from the figures shown below I first plotted the graph of the regression lines of the model without interaction, associated with each category of the qualitative variable.
+I found interaction between variables where in the first case the straight lines are all parallel to each other and in the second respectively are not, this we can see in the next two graphs.
+After assuming interaction for each pair of qualitative and quantitative variables, I selected the most significant difference, which is the interaction between Country and Rounds, as we can see form figure 3.
+```{r echo=FALSE, fig.cap="Figure 3"}
+ols_3 = lm(Earnings ~ Rounds + Country, data = PGATour)
+par(mfrow = c(1,2))
+plot(PGATour$GIR, PGATour$Earnings,pch=unclass(PGATour$Country), col=unclass(PGATour$Country), xlab = "Rounds", ylab = "Earnings", main = "Earnings & Rounds")
+legend("top", legend=levels(PGATour$Country),
+       pch = unique(unclass(PGATour$Country)),
+       col=unique(unclass(PGATour$Country)), cex=0.4)
+abline(coefficients(ols_3)[1],coefficients(ols_3)[3], col=4)
+abline(coefficients(ols_3)[1]+coefficients(ols_3)[2],
+       coefficients(ols_3)[3], col=2)
+ols3 = lm(Earnings ~ Rounds*Country, data = PGATour )
+plot(PGATour$GIR, PGATour$Earnings,pch=unclass(PGATour$Country), col=unclass(PGATour$Country), xlab = "Rounds", ylab = "Earnings", main = "Earnings & Country interaction")
+legend("top", legend=levels(PGATour$Country),
+       pch = unique(unclass(PGATour$Country)),
+       col=unique(unclass(PGATour$Country)), cex=0.4)
+abline(coefficients(ols3)[1],coefficients(ols3)[2], col=4)
+abline(coefficients(ols3)[1]+coefficients(ols3)[3],
+       coefficients(ols3)[2]+coefficients(ols3)[4], col=2)
+```
+
+#### Full linear model with interaction terms:
+```{r echo=FALSE}
+ols2 = lm(Earnings ~ Rounds*Country + Strks + ScoreAVG + Sponsor + DrivAccuracy + GIR + GreensHIT + RelPar + AVGPutting + AVGDrivDistance, data = PGATour)
+summ = summary(ols2)
+summ$coefficients
+```
+From the summary of the coefficients of the model we can see the value of the intercept, or the expected value of the variable response Earnings, when all the independent variables in the model are zero; while the coefficients associated with all the independent variables indicate the expected change in Earnings (y) for a unit change in the independent variables, keeping all other variables in the model constant.
+In particular from a first screening we can see that the coefficients with the minus sign, represent an inverse relationship between the y and the x, that is ScoreAVG, Sponsor, GreensHIT, RelPar and the interaction term Rounds:CountryUSA, which indicates that the response will receive a decrease in absolute value of $ 51073 for an increase of one unit in Rounds, considering the USA group compared to the reference Other.
+Among these negative relationships it is worth pointing out the relationship between Earnings and GreensHIT, I certainly did not expect a negative value because logically a player more green takes more will have the ScoreAVG low and then will win more races.
+We will investigate this value later in our analysis.
+
+##### Model selection via Best Subset Selection
+```{r include=FALSE}
+install.packages("leaps", repos = "http://cran.stat.unipd.it/")
+```
+
+```{r echo=FALSE, message=FALSE}
+library(leaps)
+ols1 = regsubsets (Earnings ~ Rounds*Country + Strks + ScoreAVG + Sponsor + GIR + GreensHIT + RelPar + AVGPutting + DrivAccuracy + AVGDrivDistance, data = PGATour, nvmax = 11)
+summ = summary(ols1)
+summ
+```
+In the above ouput we have the selection of the best model for each number of predictors, from 1 to 11.
+The best model with 1 predictor is the one formed by Earnings ~ ScoreAVG, while the second is the one formed by Earnings ~ ScoreAVG + AVGDrivDistance, and so on, up to the model with 11 predictors, that is the complete one.
+Remember that the regsubset() function uses as a method to select which is the best model with tot predictors RSS and R 2, which makes it 100% reliable only when the number of predictors p is small, ours is not the case.
+
+##### Selecting the best overall model according AIC, BIC, Cp Mallow's and adjusted R^2
+For cross validation I decided to include the leave one out approach, because this allowed me to overcome the problems with the decision on the division of the sample and to make a more objective analysis.
+```{r echo=FALSE, message=FALSE, fig.cap="Figure 4 : *From the figure we can see that, for the graphs of BIC, AIC and R 2 their values increase with the increase of the number of predictors, for R 2 in particular, the variability of the y that there are from 6 to 11 predictors, is explained almost the same way, So by Occam’s theorem, we’ll choose the leanest model. As for the other graphs instead the Mallow' Cp, has the minimum point in the model with 7 predictors, the same occurs for LOOCV. Thus lead us to choose as the best overall model, the model with 7 predictors*. " }
+library(leaps)
+ols1 = regsubsets (Earnings ~ Rounds*Country + Strks + ScoreAVG + Sponsor + GIR + GreensHIT + RelPar + AVGPutting + DrivAccuracy + AVGDrivDistance, data = PGATour, nvmax = 11)
+summ = summary(ols1)
+par(pty="s",mfrow=c(1,5),mar=c(2,1,2,1))
+plot(summ$bic, type="b", pch=19,
+     xlab="Number of predictors", xlim = c(1,11), ylim = c(-30,0), ylab="", main="BIC")
+abline (v=which.min(summ$bic),col = 2, lty=2)
+plot(summ$cp, type="b", pch=19, 
+     xlab="Number of predictors", xlim = c(1,11), ylim = c(0,20), ylab="", main="Mallow' Cp")
+abline (v=which.min(summ$cp),col = 2, lty=2)
+plot(summ$adjr2, type="b", pch=19, 
+     xlab="Number of predictors", xlim = c(1,11), ylim = c(0.2,0.6), ylab="", main="Adjusted R^2")
+abline (v=which.max(summ$adjr2),col = 2, lty=2)
+for (p in 2:12) {
+  AIC = -63*log(summ$rss)/63+p*2
+}
+min_AIC = min(AIC)
+min_predictors = which.min(AIC)
+plot(AIC  ~  I(1:11),ylab ="", xlab ="Number of predictors", main="AIC", pch = 19, type = "b")
+abline(v = min_predictors, col = "red", lty =  3, lwd =   2)
+library(leaps)
+p = 11
+k = nrow(PGATour)
+folds = sample (1:k,nrow(PGATour), replace = FALSE)
+cv.errors = matrix (NA ,k, p)
+PGATour$Country = factor(PGATour$Country)
+PGATour$Sponsor = factor(PGATour$Sponsor)
+for(j in 1:k){
+  best.fit = regsubsets (Earnings ~ Rounds*Country + ScoreAVG + GIR + GreensHIT + RelPar + AVGPutting + AVGDrivDistance + DrivAccuracy + Strks + Sponsor, nvmax = 11, data=PGATour[folds!=j,])
+  for(i in 1:p) {
+    mat = model.matrix(as.formula(best.fit$call[[2]]), PGATour[folds==j,])
+    coefi = coef(best.fit, id = i)
+    xvars = names(coefi )
+    pred = mat[,xvars ]%*% coefi
+    cv.errors[j,i] = mean((PGATour$Earnings[folds==j] - pred)^2)
+  }
+}
+cv.mean = colMeans(cv.errors)
+plot(cv.mean ,type="b",pch=19,
+     main = "LOOCV",
+     xlab="Number of predictors",
+     ylab="CV error")
+abline(v=which.min(cv.mean), col=2, lty=2)
+```
+
+##### Best predictors
+```{r echo=FALSE, fig.cap="Figure 5: *In the three charts, the best predictors are represented, in darker black color if the value of BIC and Cp Mallow' is lower and the value of R 2 is higher. From here we can select the best 7 predictors, which are: Rounds, ScoreAVG, Sponsor, GIR, GreensHIT, AVGPutting, AVGDrivDistance*."}
+par(pty="s",mfrow=c(1,3),mar=c(2,1,2,1))
+plot(ols1, scale = "Cp")
+plot(ols1, scale = "adjr2")
+plot(ols1, scale = "bic")
+```
+
+#### Collinearity issues
+```{r message=FALSE, warning=FALSE, include=FALSE}
+chooseCRANmirror(ind=31)
+install.packages("car")
+library(car)
+```
+
+```{r echo=TRUE}
+best_model = lm(Earnings ~ Rounds + ScoreAVG + Sponsor + GIR + GreensHIT + AVGPutting + AVGDrivDistance, data = PGATour)
+vif(best_model)
+```
+
+As we can see from the table above, where there are represented values of GVIF, which is a numerical index that measures how much the increase in the variance of a regression coefficient is due to the collinearity between independent variables. Therefore we are not in the presence of significant hilliness, taking into account the canonical threshold value of 5/10.
+
+#### Diagnostics
+```{r echo = FALSE, warning=FALSE, fig.cap="Figure 7 : *From the chart above we can avert several assumptions. First we can say that the hypothesis of normality of the residuals has been respected, in fact the points are distributed approximately along the red line.The general condition of linearity of the model seems to be fulfilled, as the red line in the top left graph does not appear to have large deviations from the horizontal line.The hypothesis of variance-non-costant instead we can hardly notice that it is violated, by the graph Scale-Location, that if such condition had been respected, the red line would have had to be a flat one.From the graph above, we can identify also the so-called unusual observations. The first observation that jumps to the eye is the number 5, which turns out to be, as we note from the first graph in the upper left, a possible outlier, then a point that does not fit into the model ols2, and influential point, given its high Cook Distance, as confirmed also from the diagram in figure 8.Instead observation 1, as we see from the graph in the lower right and from figure 9 has a high leverage, almost close to 1.0, this means that its value is very far from its average. Another observation with a very high leverage point, as we can see from the graph in figure 8, is observation number two*." }
+library(car)
+par(mfrow = c(2,2))
+plot(best_model)
+```
+
+##### Inspecting influential points
+
+```{r echo=FALSE, fig.cap="Figure 8 : *From the graph we can see from the y-axis the value of the Cook Distance, while from the x-axis, we can see the distribution of each observation*."}
+library(ggplot2)
+cook_distance <- cooks.distance(best_model)
+max_cook_ID <- which.max(cook_distance)
+cook_df <- data.frame(ID = seq_along(cook_distance), CooksDistance = cook_distance)
+ggplot(cook_df, aes(x = ID, y = CooksDistance)) +
+  geom_point() +
+  geom_hline(yintercept = 4 / length(cook_distance), linetype = "dashed", color = "red") +
+  geom_text(data = cook_df[max_cook_ID, ], aes(label = ID), hjust = -0.2, vjust = 0) +
+  labs(title = "Cook's Distance Plot",
+       x = "Observation ID",
+       y = "Cook's Distance") +
+  theme_minimal()
+```
+
+##### Inspecting possible high-leverage points 
+```{r echo=FALSE, fig.cap="Figure 9 : *From the figure above we can see on the y axys the value of the leverage that indicates how far an observation is from its average*."}
+n = nrow(PGATour)
+r = length(coef(best_model))
+h_values = hatvalues(best_model)
+high_leverages_indexes = which( h_values > (r/n) )
+plot( h_values, pch = 16, ylab = "Levegares", xlab = "Observations",
+main = "High Leverage Points Detection", ylim=c(0,1.5))
+abline(h = r/n, col = 'red', lty = 2, lwd = 2)
+abline(h=1, col = "blue", lty = 2, lwd = 2)
+text(high_leverages_indexes, h_values[high_leverages_indexes],
+labels = high_leverages_indexes, cex = 0.8, pos = 3)
+
+```
+
+#### Trying to improve my model
+###### Isolating the observation n^5
+```{r}
+PGATour[5, ]
+```
+We can see that this is an unusual observation, as Scottie Scheffler is the player who won the ranking in the WGR, and therefore a value I expected. Studying the different methods to manage this size taken as outlier, there would be the transformation of the variable with the logarithmic function. Having negative data in my dataset, however, before we could use this function properly we would have to make further changes to our variables, such as the module, or other matmatic operations that would do nothing but lose information and variability to our regression analysis. The goal of the PGATour coaches in analyzing these statistics, and therefore mine, is not to keep in mind anomalous values of the winners of the ranking, which in most cases are short-lived phenomena, but rather to found a long-term training strategy. For the reasons listed above, for the purposes of my analysis, the least "harmful" decision is to remove observation 5 from my dataset.
+As for the other unusual observations, observation 1 and 2, they have high leverage,  one way to reduce their impact would be to try to record observations close to them, so they would not be far away, in the space of regressors.
+Regarding instead the influential points , as we see from the diagram of figure 8, none of them exceeds the canonical value of D=1, and therefore none of them is considered "harmful" for our dataset.
+```{r include=FALSE}
+PGATour_new = PGATour[-5, ]
+```
+
+##### Considerations on heteroschedasticity
+In trying to overcome the slight problem of nonconstant variances of the residues, I tried several transformations of the variables, which while slightly improving the variances, All they did was add computational complexity and find unusable models for the primary objective of my regression.
+I also tried to insert weights with WLS, but my model had practically no difference with the starting model. Since this is a slight heteroschedasticity problem, and for the purpose of my analysis has little relevance, I decided to accept it as it was.
+```{r echo = FALSE, fig.cap="Figure 10 : *Below I selected the two best transformations I tried to apply to my data compared to my model without mathematical transformations.As we can see, there are no significant differences in the violated homoschedasticity hypothesis*."}
+par(mfrow = c(1,3))
+plot(fitted(best_model),sqrt(abs(residuals(best_model))), pch = 16, xlab="Fitted",ylab=
+       expression(sqrt(hat(epsilon))), main = "Original Model")
+
+
+dati_pos <- data.frame(
+  Earnings_pos = log(abs(min(PGATour$Earnings)) + 1) + PGATour$Earnings,
+  Rounds_pos = log(abs(min(PGATour$Rounds)) + 1) + PGATour$Rounds,
+  GIR_pos = log(abs(min(PGATour$GIR)) + 1) + PGATour$GIR,
+  ScoreAVG_pos = log(abs(min(PGATour$ScoreAVG)) + 1) + PGATour$ScoreAVG,
+  GreensHIT_pos = log(abs(min(PGATour$GreensHIT)) + 1) + PGATour$GreensHIT,
+  AVGPutting_pos = log(abs(min(PGATour$AVGPutting)) + 1) + PGATour$AVGPutting,
+  AVGDrivDistance_pos = log(abs(min(PGATour$AVGDrivDistance)) + 1) + PGATour$AVGDrivDistance
+)
+modello <- lm(Earnings_pos ~ Rounds_pos + ScoreAVG_pos + GIR_pos + GreensHIT_pos + AVGPutting_pos + AVGDrivDistance_pos, data = dati_pos)
+res_log <- residuals(modello)
+fit_log <- fitted(modello)
+
+plot(fit_log, sqrt(abs(residuals(modello))), pch = 16, xlab = "Fitted", ylab = expression(sqrt(hat(epsilon))), main = "Log(x)")
+dati_pos <- data.frame(
+  Earnings_pos = ((abs(min(PGATour$Earnings)) + PGATour$Earnings)^0.5),
+  Rounds_pos = ((abs(min(PGATour$Rounds)) + PGATour$Rounds)^0.5),
+  GIR_pos = ((abs(min(PGATour$GIR)) + PGATour$GIR)^0.5),
+  ScoreAVG_pos = ((abs(min(PGATour$ScoreAVG)) + PGATour$ScoreAVG)^0.5),
+  GreensHIT_pos = ((abs(min(PGATour$GreensHIT)) + PGATour$GreensHIT)^0.5),
+  AVGPutting_pos = ((abs(min(PGATour$AVGPutting)) + PGATour$AVGPutting)^0.5),
+  AVGDrivDistance_pos = ((abs(min(PGATour$AVGDrivDistance)) + PGATour$AVGDrivDistance)^0.5)
+)
+
+modello <- lm(Earnings_pos ~ Rounds_pos + ScoreAVG_pos + GIR_pos + GreensHIT_pos + AVGPutting_pos + AVGDrivDistance_pos, data = dati_pos)
+res_sqrt <- residuals(modello)
+fit_sqrt <- fitted(modello)
+plot(fit_sqrt, sqrt(abs(res_sqrt)), pch = 16, xlab = "Fitted", ylab = expression(sqrt(hat(epsilon))), main = "Square root")
+
+```
+
+#### Best model obtained
+```{r echo=FALSE}
+dati <- data.frame(
+  Name = PGATour$Name[-5],
+  Rounds = PGATour$Rounds[-5],            
+  Strks = PGATour$Strks[-5],            
+  ScoreAVG = PGATour$ScoreAVG[-5],         
+  Sponsor = factor(PGATour$Sponsor[-5]),
+  GIR = PGATour$GIR[-5],             
+  GreensHIT = PGATour$GreensHIT[-5],       
+  Earnings = PGATour$Earnings[-5],     
+  RelPar = PGATour$RelPar[-5],           
+  AVGPutting = PGATour$AVGPutting[-5],      
+  DrivAccuracy = PGATour$DrivAccuracy[-5],     
+  Country = factor(PGATour$Country[-5]),
+  AVGDrivDistance = PGATour$AVGDrivDistance[-5]   
+)
+best_model = lm(Earnings ~ Rounds + ScoreAVG + Sponsor + GIR + 
+    GreensHIT + AVGPutting + AVGDrivDistance, data = dati)
+summ4 = summary(best_model)
+summ4
+```
+
+```{r echo = FALSE,message=FALSE, warning=FALSE, fig.cap= "Figure 10 : *In the figure above we have reported each isolated variable with our variable Earnings response, for the quantitative variable, the shadow zones represent the confidence intervals, which provide a range of plausible values for the estimated parameter of the model. We can isolate the predictors that have around the regression line, with slope dictated by the sign of their coefficient β, a thinner shading area, which will be those with the interval i confidence tighter, and therefore greater precision in the estimation of the parameter, for ScoreAVG. The tendency for almost all variables is to have a narrower confidence interval in the center, This is because, the precision in estimating a value that is distributed around the average is much higher than the estimate of a value that is distributed very far from the average.For the Sponsor quality variable, the confidence interval is represented by the height of the pink segments*." }
+library(effects)
+model = lm(Earnings ~ GIR, data = PGATour)
+effect_plot = effect("GIR", model)
+plot1 = plot(effect_plot, main = "Earnings and GIR")
+
+model = lm(Earnings ~ ScoreAVG, data = PGATour)
+effect_plot = effect("ScoreAVG", model)
+plot3 = plot(effect_plot, main = "Earnings and ScoreAVG")
+
+model = lm(Earnings ~ Sponsor, data = PGATour)
+effect_plot = effect("Sponsor", model)
+plot4 = plot(effect_plot, main = "Earnings and Sponsor")
+
+model = lm(Earnings ~ GreensHIT, data = PGATour)
+effect_plot = effect("GreensHIT", model)
+plot5 = plot(effect_plot, main = "Earnings and GreensHIT")
+
+library(gridExtra)
+grid.arrange(plot1,plot3, plot4,  plot5, ncol = 2)
+```
+
+```{r echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Figure 11 : *The same goes for this figure, but in this case we can identify the parameters with the most subtle confidence interval, which are AVGDrivDistance*."}
+library(effects)
+model = lm(Earnings ~ AVGPutting, data = PGATour)
+effect_plot = effect("AVGPutting", model)
+plot8 = plot(effect_plot, main = "Earnings and AVGPutting")
+
+model = lm(Earnings ~ AVGDrivDistance, data = PGATour)
+effect_plot = effect("AVGDrivDistance", model)
+plot11 = plot(effect_plot, main = "Earnings and AVGDrivDistance")
+
+model = lm(Earnings ~ Rounds, data = PGATour)
+effect_plot = effect("Rounds", model)
+plot12 = plot(effect_plot, main = "Earnings and Rounds")
+
+
+library(gridExtra)
+grid.arrange(plot8, plot11, plot12, ncol = 2)
+
+```
+
+#### Hypothesis Testing 
+
+##### Testing each βj
+The two-tailed test on each coefficient of the model consists of an H0 hypothesis, for which the coefficient in question is equal to 0, so its presence in the model is irrelevant, and an H1 hypothesis, for which it is different from zero, so it has a significant impact in explaining our response in our model.
+In general all the coefficients of the model flanked by asterisks are significant for a level <0.01, in particular ScoreAVG, and therefore have a very low p-value.
+The very low p-value makes sure that we can reject the null hypothesis listed above, and that therefore the coefficient in question is useful in the model.
+In particular for Rounds, we will reject the null hypothesis at a significance level > 0.01, for ScoreAVG, there is always extreme evidence against the null hypothesis, for GreensHIT, we will reject the null hypothesis for a significance level of 0.1,  AVGDrivDistance has strong evidence against the null hypothesis up to a significance level of 0.001.
+The same conclusions could have been drawn by seeing the presence or absence of zeros in the confidence interval, in fact for all variables, whose confidence interval contains zero, more or less widely, as we can see from the graph in Figure 10 and 1, will have evidence against the null hypothesis.
+
+##### Testing a group of regressor and all regressor
+###### All regressor
+To test all regressors at once, then the system of hypotheses for which the H0 hypothesis states that all coefficients are equal to 0, while the H1 hypothesis states that at least one of them is null.
+The value of the global F-test p-value is 5.16e-06, so we can safely conclude that we will reject the null hypothesis and accept the opposite hypothesis, because as we expected, and as we have already shown above, some coefficients of the model are important players in our analysis.
+
+###### Test a group of regressor
+I decided to compare the complete model with 7 predictors and the model composed only of the most significant variables for the model, that is, those marked in the summary ouput with asterisks or black dots on the side, to see if there is a difference between the two models.
+
+```{r echo=TRUE}
+ols_1 = lm(Earnings ~ Rounds + ScoreAVG + GreensHIT + AVGDrivDistance, data = PGATour_new)
+anova(best_model,ols_1)
+```
+
+As we can deduce from the output above, from the little difference of the residual degrees of freedom between the complete model and the reduced one, we can say in first analysis that the two models little differ.
+This conclusion is also confirmed by the high p-value.
+So we’ll see the null hypothesis, that the complete model is not significantly better than the smaller model, with only the most significant predictors; this means that the most significant predictors added to the model, do not significantly impact in explaining the answer and their presence or not in the model is almost useless.
+
+#### Goodness of fit
+As a measure of goodness of the model, I presented below the values of R 2 and R 2 weighted to the degrees of freedom of the model.
+The first tells us the perentual variability of Earnings explained by the independent variables of our model, or a percentage of about 51%, then more than half the variability of y can be explained by our model, this definitely is an indicator of just how good our model is.
+The second indicator instead indicates R 2 taking into account the number of independent variables, which in our case are 53. With this measurement we can compare with the adj.r^2 of the full model ols2, that is 0.4679, we can therefore conclude that between the full model and the reduced model with the best predictors of the response, we can give up a miserable loss in the explanation of the response.
+We are more interested in the second value, as it manages to eliminate the tendency of R 2 to increase as the number of variables increases, being about 46% I can conclude, that mine is a good model.
+
+```{r}
+best_model = lm(Earnings ~ Rounds + ScoreAVG + Sponsor + GIR + 
+    GreensHIT + AVGPutting + AVGDrivDistance, data = PGATour_new)
+summ4 = summary(best_model)
+summ4$r.squared
+summ4$adj.r.squared
+```
+
+Another useful measure to understand the goodness of the model is the p-value associated with the F test, the value of which will or will not prove against the null hypothesis, for which all the coefficients are equal to zero, and consequently a not good model. The p-value is 3.327e-08, very low, so we can reject the null hypothesis in favour of hypothesis H1, which establishes that at least one of the coefficients of the model is different from 0.
+
+
+
+#### Prediction
+From the below ouput we can see that our new observation, which has been assigned a prediction of the response, with a probability of 95%, equal to -321726.6, which refocusing the variable would have been 1'972'667 $.
+In particular to this variable I assigned the data related to the player who earned the most in 2022 on the European Tour, the European equivalent of the PGA Tour. In particular it is Rory Mcilroy, who in Europe with those numbers won 7mln €, while in America he would have won approximately 1'972'667 $.
+The amplitude of the prediction interval is quite large, this means, as we expected, that the response was predicted on the new observation with great uncertainty.
+
+```{r echo=FALSE, fig.cap= "Figure 12 : *The expected score is represented by a blue point, while the forecast interval is represented by a red bar indicating the variability or uncertainty of the forecast. The width of the prediction interval is also confirmed by the height of the red bar, which covers much of the chart*.", Out.width = "50%"}
+data_new <- data.frame(
+  Name = "Rory McIlroy",
+  Rounds = as.numeric(30),            
+  Strks = as.numeric(0.5),            
+  ScoreAVG = as.numeric(1.0),         
+  Sponsor = "Callaway",
+  GIR = as.numeric(-8.0),             
+  GreensHIT = as.numeric(-400),       
+  RelPar = as.numeric(1.5),           
+  AVGPutting = as.numeric(-0.2),      
+  DrivAccuracy = as.numeric(1.0),     
+  Country = "USA",
+  AVGDrivDistance = as.numeric(-20)   
+)
+data_new$Sponsor <- as.factor(data_new$Sponsor)
+data_new$Country <- as.factor(data_new$Country)
+prediction = predict(best_model, newdata = data_new)
+prediction_interval = predict(best_model, newdata = data_new, interval = "prediction", level = 0.95)
+prediction_interval
+prediction_df <- data.frame(
+ LowerBound = prediction_interval[, "lwr"],
+ UpperBound = prediction_interval[, "upr"],
+ PredictedScore = prediction_interval[, "fit"]
+)
+prediction_df$Player <- "Rory McIlroy"
+library(ggplot2)
+ggplot(prediction_df, aes(x = Player)) +
+ geom_point(aes(y = PredictedScore), color = "blue") +
+ geom_errorbar(aes(ymin = LowerBound, ymax = UpperBound), width = 0.2, color = "red") +
+ labs(title = "Prediction Interval for Rory McIlroy",
+       x = "European Tour Player",
+       y = "Predicted Earnings") +
+ theme_minimal()
+```
+
+
+
+#### Simulating 100 data points
+Simulating these 100 data points, I used for the independent variable the uniform destruction with min equal to the minimum of each variable from the dataset PGATour, instead regarding the calculation of the variable answer, I followed the values of the coefficients obtained in the best_model and their std errors.
+
+```{r, echo=FALSE}
+coefficients = coef(best_model)
+set.seed(12345)  
+n = 100  
+simulated_data <- data.frame(
+ Rounds = runif(n, min = min(PGATour$Rounds), max = max(PGATour$Rounds)),
+ ScoreAVG = runif(n, min = min(PGATour$ScoreAVG), max = max(PGATour$ScoreAVG)),
+ GIR = runif(n, min = min(PGATour$GIR), max = max(PGATour$GIR)),
+ AVGPutting = runif(n, min = min(PGATour$AVGPutting), max = max(PGATour$AVGPutting)),
+ AVGDrivDistance = runif(n, min = min(PGATour$AVGDrivDistance), max = max(PGATour$AVGDrivDistance)),
+ GreensHIT = runif(n, min = min(PGATour$GreensHIT), max = max(PGATour$GreensHIT)),
+ Sponsor = factor(sample(c("Callaway", "Titleist", "Taylormade"), size = n, replace = TRUE)))
+simulated_data$Sponsor_Callaway <- ifelse(simulated_data$Sponsor == "Callaway", 1, 0)
+simulated_data$Sponsor_Titleist <- ifelse(simulated_data$Sponsor == "Titleist", 1, 0)
+simulated_data$Sponsor_Taylormade <- ifelse(simulated_data$Sponsor == "Taylormade", 1, 0)
+mean_prediction <- summ4$coefficients[1] + 
+                   summ4$coefficients[2]*simulated_data$Rounds + 
+                   summ4$coefficients[3]*simulated_data$ScoreAVG + 
+                   summ4$coefficients[4]*simulated_data$Sponsor_Callaway + 
+                   summ4$coefficients[5]*simulated_data$Sponsor_Titleist + 
+                   summ4$coefficients[6]*simulated_data$Sponsor_Taylormade + 
+                   summ4$coefficients[7]*simulated_data$GIR + 
+                   summ4$coefficients[8]*simulated_data$GreensHIT + 
+                   summ4$coefficients[9]*simulated_data$AVGPutting + 
+                   summ4$coefficients[10]*simulated_data$AVGDrivDistance 
+std_dev <- sqrt(sum(coefficients[-1]^2 * var(simulated_data$Rounds) + var(simulated_data$ScoreAVG) + var(simulated_data$GIR) + var(simulated_data$GreensHIT) + var(simulated_data$AVGPutting) + var(simulated_data$AVGDrivDistance)))
+simulated_data$SimulatedResponse <- rnorm(n, mean = mean_prediction, sd = std_dev)
+simulated_data = cbind(simulated_data, Earnings = simulated_data$SimulatedResponse)
+```
+
+```{r echo =FALSE, warning=FALSE, fig.cap="Figure 13: *In the figure, we can see the comparison of the relationship between the simulated response and the simulated ScoreAVG variable in the graph on the top-left, we also note that the observations are many more (100) than the original ones (63), and on the right the relationship of the original data, the same holds for AVGDrivDistance, the red graph is the orignal one*."}
+library(ggplot2)
+library(gridExtra)
+plot1 = ggplot(simulated_data, aes(x = ScoreAVG, y = Earnings)) +
+ geom_point() +
+ labs(title = "Simulated Data",
+      x = "ScoreAVG",
+      y = "Simulated Response") +
+ theme_minimal()
+plot2 = ggplot(PGATour_new, aes(x = PGATour_new$ScoreAVG, y = Earnings)) +
+ geom_point(color = "red") +
+ labs(title = "Original Data",
+      x = "ScoreAVG",
+      y = "Response") +
+ theme_minimal()
+
+plot3 = ggplot(simulated_data, aes(x = AVGDrivDistance, y = Earnings)) +
+ geom_point() +
+ labs(title = "Simulated Data",
+      x = "AVGDrivDistance",
+      y = "Simulated Response") +
+ theme_minimal()
+plot4 = ggplot(PGATour_new, aes(x = PGATour_new$AVGDrivDistance, y = Earnings)) +
+ geom_point(color = "red") +
+ labs(title = "Original Data",
+      x = "AVGDrivDistance",
+      y = "Response") +
+ theme_minimal()
+
+
+grid.arrange(plot1, plot2, plot3, plot4,  ncol = 2)
+
+```
+
+
+
+
+
