@@ -1,0 +1,4 @@
+The following dataset represent PGA Tour’s golf Players Stats of 2021/2022 season, taken from [https://www.pgatour.com/stats.html], which is the official website of PGA Tour. 
+The PGA Tour is an organization that runs the leading professional golf tours in the United States. 
+The study is done by all the coaches of the PGA Tour, to improve the playing conditions of their player, with the main objective of improving their game, and then to increase their earnings, For this you research what are the factors that affect the most seasonal earnings of a player. 
+Here is an article with the example of player Scott Stallings. [https://www.golfdigest.com/story/why-a-little-stat-analysis-goes-a-long-way-on-the-pga-tour]. I decided to center all my data to its mean value, in order to overcome the discrepancy in the units of measurement.
